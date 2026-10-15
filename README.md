@@ -18,4 +18,3 @@ Use `success_response(...)` or raise `NotFound` / `Conflict` / etc. from `ecom_c
 
 ## Adding a service
 Copy `services/_template`, rename it, add a Dockerfile and compose entry, add a gateway route.
-# ecommence_backend_microservice
