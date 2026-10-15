@@ -1,8 +1,9 @@
 .PHONY: install up down logs test lint format
 
+PY ?= $(CURDIR)/.venv/Scripts/python
+
 install:
-	uv venv --python 3.12
-	uv pip install -e "libs/common[dev]" -e "services/_template[dev]" ruff mypy
+	$(PY) -m pip install -e "libs/common[dev]" -e "services/_template[dev]" ruff mypy
 
 up:
 	docker compose up -d --build
@@ -14,12 +15,12 @@ logs:
 	docker compose logs -f
 
 test:
-	.venv/Scripts/python -m pytest libs/common/tests
-	cd services/_template && ../../.venv/Scripts/python -m pytest
+	$(PY) -m pytest libs/common/tests
+	cd services/_template && $(PY) -m pytest
 
 lint:
-	.venv/Scripts/ruff check .
-	.venv/Scripts/mypy libs/common/ecom_common
+	$(PY) -m ruff check .
+	$(PY) -m mypy libs/common/ecom_common
 
 format:
-	.venv/Scripts/ruff format .
+	$(PY) -m ruff format .

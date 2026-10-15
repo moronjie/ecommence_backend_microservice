@@ -23,7 +23,7 @@ def build_health_router(
         for name, check in checks.items():
             try:
                 await check()
-            except Exception as exc: 
+            except Exception as exc:  # noqa: BLE001 - report any dependency failure
                 failures[name] = str(exc)
         if failures:
             return error_response(
