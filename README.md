@@ -18,3 +18,16 @@ Use `success_response(...)` or raise `NotFound` / `Conflict` / etc. from `ecom_c
 
 ## Adding a service
 Copy `services/_template`, rename it, add a Dockerfile and compose entry, add a gateway route.
+
+## Gateway (Phase 1)
+All client traffic goes through `services/gateway` (port 8000). It routes by path prefix (see
+`services/gateway/app/core/routes.py`), verifies the JWT, rate-limits per user/IP with Redis,
+forwards `X-User-Id` / `X-User-Role` / `X-Request-ID`, and maps upstream failures to uniform
+401 / 404 / 429 / 502 / 503 / 504 responses. `GET /health/services` reports every upstream.
+
+Run locally (needs Redis for rate limiting; if Redis is down the gateway lets requests through):
+```bash
+cd services/gateway && python -m uvicorn app.main:app --reload --port 8000
+cd services/_template && python -m uvicorn app.main:app --reload --port 8100   # stub upstream
+curl localhost:8000/api/v1/template/ping
+```
