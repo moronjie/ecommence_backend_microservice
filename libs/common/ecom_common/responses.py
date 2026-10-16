@@ -33,6 +33,7 @@ def error_response(
     error_message: str = "",
     status_code: int = 400,
     data: Any = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     body = ApiResponse[Any](
         success=False,
@@ -40,7 +41,9 @@ def error_response(
         data=jsonable_encoder(data) if data is not None else {},
         error_message=error_message or message,
     )
-    return JSONResponse(status_code=status_code, content=body.model_dump(mode="json"))
+    return JSONResponse(
+        status_code=status_code, content=body.model_dump(mode="json"), headers=headers
+    )
 
 
 def paginated(items: list[Any], total: int, page: int, size: int) -> dict[str, Any]:

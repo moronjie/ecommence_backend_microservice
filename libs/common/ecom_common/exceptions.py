@@ -23,11 +23,13 @@ class AppException(Exception):
         message: str | None = None,
         status_code: int | None = None,
         data: Any = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         self.error_message = error_message or (message or self.message)
         self.message = message or self.message
         self.status_code = status_code or self.status_code
         self.data = data
+        self.headers = headers
         super().__init__(self.error_message)
 
 
@@ -57,7 +59,9 @@ class ValidationFailed(AppException):
 
 
 async def _app_exception_handler(_: Request, exc: AppException):
-    return error_response(exc.message, exc.error_message, exc.status_code, exc.data)
+    return error_response(
+        exc.message, exc.error_message, exc.status_code, exc.data, headers=exc.headers
+    )
 
 
 async def _validation_handler(_: Request, exc: RequestValidationError):
