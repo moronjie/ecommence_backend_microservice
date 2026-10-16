@@ -11,8 +11,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e "libs/common[dev]" -e "services/_template[dev]" ruff mypy
+      - run: pip install -e "libs/common[dev]" -e "services/_template[dev]" -e "services/gateway[dev]" ruff mypy
       - run: ruff check .
-      - run: mypy libs/common/ecom_common
+      - run: mypy libs/common/ecom_common services/gateway/app
       - run: pytest libs/common/tests
       - run: cd services/_template && pytest
+      - run: cd services/gateway && pytest

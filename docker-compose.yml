@@ -66,6 +66,26 @@ services:
     depends_on:
       kafka: { condition: service_healthy }
 
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    ports: ["8000:8000"]
+    environment:
+      SERVICE_NAME: gateway
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      REDIS_URL: redis://redis:6379/0
+      TEMPLATE_URL: http://template:8000
+      AUTH_URL: http://auth:8000
+      USER_URL: http://user:8000
+      PRODUCT_URL: http://product:8000
+      INVENTORY_URL: http://inventory:8000
+      CART_URL: http://cart:8000
+      ORDER_URL: http://order:8000
+      PAYMENT_URL: http://payment:8000
+    depends_on:
+      redis: { condition: service_healthy }
+
   template:
     build:
       context: .
