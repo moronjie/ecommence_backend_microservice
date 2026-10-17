@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import DateTime, func
 from sqlalchemy.ext.asyncio import (
@@ -26,8 +27,8 @@ class TimestampMixin:
     )
 
 
-def create_engine(database_url: str, echo: bool = False) -> AsyncEngine:
-    return create_async_engine(database_url, echo=echo, pool_pre_ping=True)
+def create_engine(database_url: str, echo: bool = False, **kwargs: Any) -> AsyncEngine:
+    return create_async_engine(database_url, echo=echo, pool_pre_ping=True, **kwargs)
 
 
 def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
