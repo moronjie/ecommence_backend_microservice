@@ -1,12 +1,44 @@
+import asyncio
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError
 
 from ecom_common.exceptions import Unauthorized
 
 ACCESS = "access"
 REFRESH = "refresh"
+
+_hasher = PasswordHasher()
+
+
+def hash_password(password: str) -> str:
+    return _hasher.hash(password)
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    try:
+        return _hasher.verify(password_hash, password)
+    except (VerificationError, InvalidHashError):
+        return False
+
+
+# Argon2 is deliberately slow (tens of ms, ~64 MB). Calling it directly in an async handler would
+# freeze the event loop, so run it in a thread and cap how many run at once (memory).
+_hash_slots = asyncio.Semaphore(4)
+
+
+async def hash_password_async(password: str) -> str:
+    async with _hash_slots:
+        return await asyncio.to_thread(hash_password, password)
+
+
+async def verify_password_async(password: str, password_hash: str) -> bool:
+    async with _hash_slots:
+        return await asyncio.to_thread(verify_password, password, password_hash)
 
 
 def create_token(
@@ -24,6 +56,7 @@ def create_token(
         "sub": subject,
         "role": role,
         "type": token_type,
+        "jti": uuid.uuid4().hex,
         "iat": now,
         "exp": now + expires_in,
         **(extra or {}),
