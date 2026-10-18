@@ -16,4 +16,9 @@ Envelope for every Kafka message:
 | payment.completed / payment.failed | payment | order, inventory (release), notification |
 | order.confirmed / order.cancelled | order | notification |
 
+`user.registered` payload: `{user_id, email, full_name, role}`.
+
+Consumers are idempotent: they record `event_id` in a `processed_events` table in the same transaction as
+their own changes and skip duplicates. Handlers run up to 3 times with backoff.
+
 Failed messages go to `<topic>.dlq` after retries. Topics are created by `infra/kafka/create-topics.sh`.

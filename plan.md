@@ -102,6 +102,8 @@ Every endpoint (success and error) returns:
 - **Quality gates**: ruff, mypy, pytest in pre-commit and CI; Dockerfiles multi-stage, non-root.
 
 ## Phases (one service per phase)
+**Status:** Phase 0 done, Phase 1 (gateway) done, Phase 2 (auth) done, Phase 3 (user) done. Both verified end to end without Docker (Kafka transport itself not yet exercised). Docker stack not yet run (Docker Hub unreachable on dev machine).
+
 Each phase ends with: Alembic migration, tests passing, Dockerfile + compose entry, gateway route, README section, and a Postman/`.http` collection entry.
 
 | # | Phase | Scope | Done when |

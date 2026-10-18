@@ -31,3 +31,34 @@ cd services/gateway && python -m uvicorn app.main:app --reload --port 8000
 cd services/_template && python -m uvicorn app.main:app --reload --port 8100   # stub upstream
 curl localhost:8000/api/v1/template/ping
 ```
+
+## Auth service (Phase 2)
+`services/auth` (port 8001): `POST /api/v1/auth/register | login | refresh | logout`, `GET /me`.
+Passwords use argon2. Access tokens last 15 min; refresh tokens last 7 days and are single-use
+(rotated; used or logged-out tokens are denylisted in Redis). Registration writes a
+`user.registered` event to an outbox table in the same transaction; a background relay publishes
+it to Kafka (events queue safely if Kafka is down). Set `ADMIN_EMAIL`/`ADMIN_PASSWORD` to create
+an admin on startup.
+
+Run locally (from the service folder, because every service has a package named `app`):
+```bash
+cd services/auth
+python -m alembic upgrade head          # needs Postgres (docker compose up -d postgres)
+python -m uvicorn app.main:app --reload --port 8001
+```
+Never `pip install` a service into the shared venv; `make install` only installs the shared lib
+and third-party packages.
+
+## User service (Phase 3)
+`services/user` (port 8002, route `/api/v1/users`): `GET/PATCH /me`, addresses under
+`/me/addresses` (add, update, delete; the first becomes the default; max 10), and admin-only
+`GET /` (paginated) and `GET /{user_id}`. The role comes from the gateway's `X-User-Role` header.
+
+The profile is **not** created by an API call. The service consumes `user.registered` from Kafka
+and creates it, so there is a short delay after sign-up during which `GET /me` returns 404
+("try again in a moment"). Handling is idempotent (`processed_events` table), failures are retried
+3 times, then the event is parked on `user.registered.dlq`.
+
+Running a service locally: `docker compose` now publishes only the gateway (port 8000). The
+`docker-compose.override.yml` file (loaded automatically) also opens Postgres, Redis, Kafka and the
+services on localhost for development. For a locked-down run use `docker compose -f docker-compose.yml up`.
