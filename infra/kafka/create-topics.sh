@@ -8,6 +8,7 @@ TOPICS=(
   inventory.reserved inventory.failed inventory.released
   order.created order.confirmed order.cancelled
   payment.completed payment.failed
+  user.registered.dlq
   notification.dlq
 )
 for t in "${TOPICS[@]}"; do

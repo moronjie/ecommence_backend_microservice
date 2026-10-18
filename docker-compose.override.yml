@@ -1,0 +1,16 @@
+# Development only: expose infrastructure and services on localhost for debugging.
+services:
+  postgres:
+    ports: ["5432:5432"]
+  redis:
+    ports: ["6379:6379"]
+  kafka:
+    ports: ["9092:9092"]
+  kafka-ui:
+    ports: ["8080:8080"]
+  auth:
+    ports: ["8001:8000"]
+  user:
+    ports: ["8002:8000"]
+  template:
+    ports: ["8100:8000"]
