@@ -17,8 +17,16 @@ jobs:
       - run: cd services/gateway && mypy app
       - run: cd services/auth && mypy app
       - run: cd services/user && mypy app
+      - run: cd services/product && mypy app
+      - run: cd services/inventory && mypy app
+      - run: cd services/cart && mypy app
+      - run: cd services/order && mypy app
       - run: pytest libs/common/tests
       - run: cd services/_template && pytest
       - run: cd services/gateway && pytest
       - run: cd services/auth && pytest
       - run: cd services/user && pytest
+      - run: cd services/product && pytest
+      - run: cd services/inventory && pytest
+      - run: cd services/cart && pytest
+      - run: cd services/order && pytest

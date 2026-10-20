@@ -12,5 +12,13 @@ services:
     ports: ["8001:8000"]
   user:
     ports: ["8002:8000"]
+  product:
+    ports: ["8003:8000"]
+  inventory:
+    ports: ["8004:8000"]
+  cart:
+    ports: ["8005:8000"]
+  order:
+    ports: ["8006:8000"]
   template:
     ports: ["8100:8000"]

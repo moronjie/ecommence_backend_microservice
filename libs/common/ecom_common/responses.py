@@ -18,6 +18,7 @@ def success_response(
     data: Any = None,
     message: str = "Success",
     status_code: int = 200,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     body = ApiResponse[Any](
         success=True,
@@ -25,7 +26,9 @@ def success_response(
         data=jsonable_encoder(data) if data is not None else {},
         error_message="",
     )
-    return JSONResponse(status_code=status_code, content=body.model_dump(mode="json"))
+    return JSONResponse(
+        status_code=status_code, content=body.model_dump(mode="json"), headers=headers
+    )
 
 
 def error_response(

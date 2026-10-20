@@ -20,6 +20,10 @@ class Base(DeclarativeBase):
 class TimestampMixin:
     """UUID primary key plus created_at / updated_at on every table."""
 
+    # Read database-generated values (created_at, the updated_at refresh) back right after each
+    # INSERT/UPDATE. Without this they are lazy-loaded on first access, which fails in async code.
+    __mapper_args__ = {"eager_defaults": True}  # noqa: RUF012
+
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

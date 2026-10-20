@@ -7,8 +7,14 @@ TOPICS=(
   product.created product.updated
   inventory.reserved inventory.failed inventory.released
   order.created order.confirmed order.cancelled
+  order.payment_requested order.refund_requested order.shipped order.delivered
+  inventory.reserved.dlq inventory.failed.dlq inventory.released.dlq
+  payment.completed.dlq payment.failed.dlq
   payment.completed payment.failed
+  cart.checked_out cart.checked_out.dlq
   user.registered.dlq
+  product.created.dlq product.updated.dlq
+  order.created.dlq order.confirmed.dlq order.cancelled.dlq
   notification.dlq
 )
 for t in "${TOPICS[@]}"; do

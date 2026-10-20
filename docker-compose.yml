@@ -114,6 +114,59 @@ services:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
 
+  product:
+    build:
+      context: .
+      dockerfile: services/product/Dockerfile
+    environment:
+      SERVICE_NAME: product-service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/product_db
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+
+  inventory:
+    build:
+      context: .
+      dockerfile: services/inventory/Dockerfile
+    environment:
+      SERVICE_NAME: inventory-service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/inventory_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+
+  cart:
+    build:
+      context: .
+      dockerfile: services/cart/Dockerfile
+    environment:
+      SERVICE_NAME: cart-service
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      PRODUCT_URL: http://product:8000
+      INVENTORY_URL: http://inventory:8000
+      USER_URL: http://user:8000
+    depends_on:
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+
+  order:
+    build:
+      context: .
+      dockerfile: services/order/Dockerfile
+    environment:
+      SERVICE_NAME: order-service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/order_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+
   template:
     build:
       context: .

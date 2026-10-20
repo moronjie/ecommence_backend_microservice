@@ -20,6 +20,10 @@ test:
 	cd services/gateway && $(PY) -m pytest
 	cd services/auth && $(PY) -m pytest
 	cd services/user && $(PY) -m pytest
+	cd services/product && $(PY) -m pytest
+	cd services/inventory && $(PY) -m pytest
+	cd services/cart && $(PY) -m pytest
+	cd services/order && $(PY) -m pytest
 
 lint:
 	$(PY) -m ruff check .
@@ -27,6 +31,10 @@ lint:
 	cd services/gateway && $(PY) -m mypy app
 	cd services/auth && $(PY) -m mypy app
 	cd services/user && $(PY) -m mypy app
+	cd services/product && $(PY) -m mypy app
+	cd services/inventory && $(PY) -m mypy app
+	cd services/cart && $(PY) -m mypy app
+	cd services/order && $(PY) -m mypy app
 
 format:
 	$(PY) -m ruff format .
