@@ -10,7 +10,8 @@ TOPICS=(
   order.payment_requested order.refund_requested order.shipped order.delivered
   inventory.reserved.dlq inventory.failed.dlq inventory.released.dlq
   payment.completed.dlq payment.failed.dlq
-  payment.completed payment.failed
+  payment.completed payment.failed payment.refunded
+  order.payment_requested.dlq order.refund_requested.dlq
   cart.checked_out cart.checked_out.dlq
   user.registered.dlq
   product.created.dlq product.updated.dlq

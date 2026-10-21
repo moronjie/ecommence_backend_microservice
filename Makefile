@@ -24,6 +24,7 @@ test:
 	cd services/inventory && $(PY) -m pytest
 	cd services/cart && $(PY) -m pytest
 	cd services/order && $(PY) -m pytest
+	cd services/payment && $(PY) -m pytest
 
 lint:
 	$(PY) -m ruff check .
@@ -35,6 +36,7 @@ lint:
 	cd services/inventory && $(PY) -m mypy app
 	cd services/cart && $(PY) -m mypy app
 	cd services/order && $(PY) -m mypy app
+	cd services/payment && $(PY) -m mypy app
 
 format:
 	$(PY) -m ruff format .

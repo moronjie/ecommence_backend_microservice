@@ -167,6 +167,22 @@ services:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
 
+  payment:
+    build:
+      context: .
+      dockerfile: services/payment/Dockerfile
+    environment:
+      SERVICE_NAME: payment-service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/payment_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      # "fake" needs no account. For Paystack: PROVIDER=paystack and PAYSTACK_SECRET_KEY=sk_test_...
+      PROVIDER: ${PAYMENT_PROVIDER:-fake}
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+      PAYMENT_CALLBACK_URL: ${PAYMENT_CALLBACK_URL:-}
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+
   template:
     build:
       context: .

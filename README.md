@@ -124,3 +124,34 @@ the inventory and payment services as described in `docs/events.md`. Customers s
 The order keeps its own copy of what was bought (names, prices) and the delivery address, so later catalogue or
 address edits never change history. Orders stuck waiting for another service are cancelled by a background sweeper.
 If a payment arrives for an already-cancelled order, `order.refund_requested` is published for the payment service.
+
+## Payment service (Phase 8) - Paystack, for Ghana
+`services/payment` (port 8007, route `/api/v1/payments`). It reacts to `order.payment_requested`, starts a payment
+with the provider, and reports `payment.completed` / `payment.failed` back to the order service. It never sees card or
+mobile-money details: the customer pays on Paystack's own page (card or mobile money: MTN MoMo, Vodafone Cash,
+AirtelTigo). Amounts are in **pesewas** (`24000` = GHS 240.00) and only **GHS** is accepted (`SUPPORTED_CURRENCIES`).
+
+How it works: a background worker asks Paystack for a payment link (retrying through outages, never reusing a
+reference it may already have sent), and the customer reads it from `GET /api/v1/payments/order/{order_id}` and is sent
+there. When they pay, Paystack calls `POST /api/v1/payments/webhooks/paystack`. That route needs no login (the gateway
+lets it through) but the request must carry a valid `x-paystack-signature`; even then the service asks Paystack to
+confirm the amount before it believes the webhook. If a webhook is missed, a reconcile worker re-checks pending
+payments; payments the customer never finishes expire after 25 minutes. If money arrives for an order that was already
+cancelled, the order service asks for a refund and the payment service sends it back.
+
+**Try it with no account** (default `PROVIDER=fake`): after a checkout, read the link, then play the customer with
+`POST /api/v1/payments/dev/{reference}/pay` (add `?outcome=failed` for a decline). That endpoint only exists with the
+fake provider.
+
+**Switch to real Paystack** (use a TEST key first):
+1. Create a Paystack account, switch the dashboard to Test mode and copy the test secret key (`sk_test_...`).
+2. Set `PAYMENT_PROVIDER=paystack` and `PAYSTACK_SECRET_KEY=sk_test_...` (in `.env` for Docker, or in the environment).
+3. Give Paystack a URL it can reach for webhooks. Locally use a tunnel (for example `ngrok http 8000`) and set the
+   webhook URL in the dashboard to `https://<tunnel>/api/v1/payments/webhooks/paystack`.
+4. Optionally set `PAYMENT_CALLBACK_URL` to your shop's thank-you page.
+5. Check the provider code against Paystack's current docs before going live: [providers/paystack.py](services/payment/app/providers/paystack.py)
+   was written from memory of their API and has only been run against a pretend Paystack. In particular confirm the
+   refund webhook's payload and which currencies/channels your account has enabled.
+
+Not built yet: a customer-facing "pay now" page (your frontend redirects to the link), partial refunds, and
+restricting the webhook to Paystack's IP addresses.

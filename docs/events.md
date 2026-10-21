@@ -33,6 +33,13 @@ and the cart is kept. `checkout_id` is derived from the cart's contents, so a re
 SAME id. **The order service must treat `checkout_id` as an idempotency key** (create at most one order per id).
 Prices are the current ones at checkout time; stock was confirmed with the inventory service just before.
 
+### Payment service
+Consumes `order.payment_requested` (`{order_id, user_id, total_cents, currency, email}`) and `order.refund_requested`.
+Publishes (key = order_id): `payment.completed` `{order_id, payment_id, amount_cents, currency, channel, reference}`,
+`payment.failed` `{order_id, payment_id, amount_cents, currency, reason}` and `payment.refunded`
+`{order_id, payment_id, amount_cents, currency, refund_id, refund_status}`. Only GHS is accepted by default.
+A payment is only reported complete after the provider itself has confirmed the amount and currency.
+
 ### Order service workflow
 `pending -> awaiting_payment -> confirmed -> shipped -> delivered`, and `cancelled` (only before payment).
 Every move is recorded in `order_status_history`. Events the order service **publishes** (key = order_id), all with

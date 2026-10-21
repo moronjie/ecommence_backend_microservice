@@ -20,5 +20,7 @@ services:
     ports: ["8005:8000"]
   order:
     ports: ["8006:8000"]
+  payment:
+    ports: ["8007:8000"]
   template:
     ports: ["8100:8000"]
