@@ -7,6 +7,9 @@ class Settings(BaseServiceSettings):
 
     outbox_relay_enabled: bool = True
 
+    # Used when a product is created without a currency
+    default_currency: str = "GHS"
+
     # Cache lifetimes. Invalidation on writes keeps data fresh; the TTL is the safety net.
     product_cache_ttl: int = 300
     list_cache_ttl: int = 60

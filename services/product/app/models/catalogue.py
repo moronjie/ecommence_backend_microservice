@@ -22,7 +22,7 @@ class Product(TimestampMixin, Base):
     # Money is stored as an integer number of minor units (cents): 1999 = 19.99. Floats and
     # decimals round differently in different places; integers never do.
     price_cents: Mapped[int] = mapped_column(BigInteger)
-    currency: Mapped[str] = mapped_column(String(3), default="USD")
+    currency: Mapped[str] = mapped_column(String(3), default="GHS")
     category_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("categories.id"), nullable=True, index=True
     )

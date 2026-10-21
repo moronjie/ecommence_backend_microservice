@@ -126,7 +126,7 @@ async def test_create_and_update_publish_events_with_snapshot(env):
         "sku": "SKU-1",
         "name": "Blue Mug",
         "price_cents": 1000,
-        "currency": "USD",
+        "currency": "GHS",  # the shop default
         "category_id": cat["id"],
         "is_active": True,
     }

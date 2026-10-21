@@ -68,6 +68,7 @@ async def test_full_life_of_an_order(env):
     assert await env.status(order_id) == "awaiting_payment"
     (ask,) = await env.published("order.payment_requested")
     assert ask["order_id"] == order_id and ask["total_cents"] == 6500  # what to charge
+    assert ask["email"] == "ada@example.com"  # who to bill
 
     await env.paid(order_id)
     assert await env.status(order_id) == "confirmed"

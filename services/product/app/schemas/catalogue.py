@@ -23,7 +23,9 @@ class ProductCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=10000)
     price_cents: int = Field(ge=0, le=10**12, description="Price in minor units, 1999 = 19.99")
-    currency: str = Field(default="USD", pattern=r"^[A-Za-z]{3}$")
+    currency: str | None = Field(
+        default=None, pattern=r"^[A-Za-z]{3}$", description="Defaults to the shop currency"
+    )
     category_id: uuid.UUID | None = None
     is_active: bool = True
 
