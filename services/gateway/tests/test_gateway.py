@@ -231,3 +231,27 @@ async def test_cors_preflight(client):
     )
     assert resp.status_code == 200
     assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+async def test_the_payment_webhook_is_public_but_only_for_post_and_only_that_path(client, upstream):
+    # Paystack carries no JWT; the payment service checks the signature instead
+    resp = await client.post(
+        "/api/v1/payments/webhooks/paystack",
+        content=b'{"event":"charge.success"}',
+        headers={"x-paystack-signature": "abc"},
+    )
+    assert resp.status_code == 200
+    sent = upstream.requests[0]
+    assert (
+        sent.content == b'{"event":"charge.success"}'
+    )  # forwarded byte for byte, or the signature breaks
+    assert sent.headers["x-paystack-signature"] == "abc"
+
+    assert_uniform(
+        await client.get("/api/v1/payments/webhooks/paystack"), 401, False
+    )  # GET is not exempt
+    assert_uniform(
+        await client.get("/api/v1/payments/order/123"), 401, False
+    )  # the rest needs a login
+    assert_uniform(await client.get("/api/v1/payments"), 401, False)
+    assert (await client.get("/api/v1/payments", headers=bearer())).status_code == 200

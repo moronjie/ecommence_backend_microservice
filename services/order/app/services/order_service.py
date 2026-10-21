@@ -99,7 +99,9 @@ class OrderService:
         order.status = to
         if to == CANCELLED:
             order.cancel_reason = reason
-        extra = {"reason": reason} if to == CANCELLED else {}
+        extra: dict[str, Any] = {"reason": reason} if to == CANCELLED else {}
+        if to == AWAITING_PAYMENT:
+            extra["email"] = order.customer_email  # the payment service bills this address
         add_event(
             self.session,
             EVENT_FOR_STATUS[to],
@@ -134,6 +136,7 @@ class OrderService:
             user_id=p.user_id,
             status=PENDING,
             currency=p.currency.upper(),
+            customer_email=p.email,
             total_cents=p.total_cents,
             shipping_address=p.shipping_address,
             history=[],  # a new order has none yet; avoids a database read on first use

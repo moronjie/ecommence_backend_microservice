@@ -34,6 +34,7 @@ class Order(TimestampMixin, Base):
     user_id: Mapped[uuid.UUID] = mapped_column(index=True)
     status: Mapped[str] = mapped_column(String(20), index=True)
     currency: Mapped[str] = mapped_column(String(3))
+    customer_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     total_cents: Mapped[int] = mapped_column(BigInteger)
     # A copy of the address at checkout time, so editing an address later cannot change old orders
     shipping_address: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)

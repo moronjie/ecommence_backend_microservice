@@ -182,7 +182,7 @@ class CatalogueService:
             name=data.name.strip(),
             description=data.description.strip(),
             price_cents=data.price_cents,
-            currency=data.currency.upper(),
+            currency=(data.currency or self.settings.default_currency).upper(),
             category_id=data.category_id,
             is_active=data.is_active,
         )

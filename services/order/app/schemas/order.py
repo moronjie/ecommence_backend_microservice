@@ -58,6 +58,7 @@ class CheckoutPayload(BaseModel):
 
     checkout_id: uuid.UUID
     user_id: uuid.UUID
+    email: str | None = Field(default=None, max_length=320)
     address_id: uuid.UUID | None = None
     shipping_address: dict[str, Any] | None = None
     currency: str = Field(min_length=3, max_length=3)

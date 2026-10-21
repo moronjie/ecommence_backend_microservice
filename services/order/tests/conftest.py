@@ -80,6 +80,7 @@ class Env:
         return {
             "checkout_id": checkout_id or str(uuid.uuid4()),
             "user_id": user,
+            "email": "ada@example.com",
             "address_id": str(uuid.uuid4()),
             "shipping_address": ADDRESS,
             "currency": "USD",
