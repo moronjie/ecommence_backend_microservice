@@ -45,6 +45,21 @@ class UserClient:
     def __init__(self, http: httpx.AsyncClient, base_url: str) -> None:
         self.http, self.base = http, base_url.rstrip("/")
 
+    async def email(self, user_id: str) -> str | None:
+        """The customer's email from their profile, or None if the profile does not exist yet."""
+        try:
+            resp = await self.http.get(
+                f"{self.base}/api/v1/users/me", headers={"X-User-Id": user_id}
+            )
+        except httpx.HTTPError as exc:
+            logger.warning("User service unreachable: %s", exc)
+            raise ServiceUnavailable("Could not look up your account, try again shortly") from exc
+        if resp.status_code == 404:
+            return None
+        if resp.status_code != 200:
+            raise ServiceUnavailable("Could not look up your account, try again shortly")
+        return resp.json()["data"]["email"]
+
     async def address(self, user_id: str, address_id: str) -> dict[str, str] | None:
         """The address's details, or None if this user has no such address."""
         try:

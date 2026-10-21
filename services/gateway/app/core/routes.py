@@ -26,6 +26,7 @@ class Route:
 
 
 GET = frozenset({"GET"})
+POST = frozenset({"POST"})
 
 
 def build_routes(s: Settings) -> list[Route]:
@@ -57,7 +58,13 @@ def build_routes(s: Settings) -> list[Route]:
         Route("inventory", "/api/v1/inventory", s.inventory_url),
         Route("cart", "/api/v1/cart", s.cart_url),
         Route("order", "/api/v1/orders", s.order_url),
-        Route("payment", "/api/v1/payments", s.payment_url),
+        # Paystack calls the webhook, not a logged-in user; the payment service checks the signature
+        Route(
+            "payment",
+            "/api/v1/payments",
+            s.payment_url,
+            public=(PublicRule("/api/v1/payments/webhooks", POST),),
+        ),
         # Dev stub so the gateway can be exercised before the real services exist
         Route(
             "template",

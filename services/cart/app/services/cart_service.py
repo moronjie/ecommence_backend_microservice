@@ -235,10 +235,17 @@ class CartService:
                 data={"total_cents": total},
             )
 
+        # The payment provider needs an email for every payment
+        email = await self.users.email(user_id)
+        if email is None:  # the profile is created from the sign-up event, a moment after sign-up
+            raise Conflict(
+                "Your account is still being set up, try again in a moment",
+                message="Cannot check out",
+            )
+
+        # Copied now, so editing the address later cannot alter the order
         shipping_address = None
-        if (
-            address_id is not None
-        ):  # copied now, so editing the address later cannot alter the order
+        if address_id is not None:
             shipping_address = await self.users.address(user_id, str(address_id))
             if shipping_address is None:
                 raise Conflict("That delivery address was not found", message="Cannot check out")
@@ -248,6 +255,7 @@ class CartService:
         payload = {
             "checkout_id": checkout_id,
             "user_id": user_id,
+            "email": email,
             "address_id": str(address_id) if address_id else None,
             "shipping_address": shipping_address,
             "currency": cart.currency,

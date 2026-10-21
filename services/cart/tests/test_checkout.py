@@ -21,6 +21,7 @@ async def test_checkout_publishes_the_order_request_and_empties_the_cart(env):
     assert (topic, key, event["event_type"]) == ("cart.checked_out", "user-1", "cart.checked_out")
     assert payload["checkout_id"] == result["checkout_id"] and payload["user_id"] == "user-1"
     assert payload["address_id"] == address and payload["total_cents"] == 6500
+    assert payload["email"] == "user-1@example.com"  # the payment provider needs it
     # a COPY of the address travels with the order, so later edits cannot change it
     assert payload["shipping_address"] == {
         "recipient": "Ada Lovelace",
@@ -161,3 +162,12 @@ async def test_checkout_with_an_address_needs_the_user_service(env):
     assert env.publisher.events == [] and len((await env.view())["items"]) == 1
     env.backend.user_service_down = False
     uniform(await checkout(env, address_id=address), 202, True)
+
+
+async def test_checkout_needs_a_profile_to_know_the_email(env):
+    await env.add(await env.product())
+    env.backend.no_profile.add("user-1")
+    uniform(await checkout(env), 409, False)  # profile not created yet: try again shortly
+    assert env.publisher.events == [] and len((await env.view())["items"]) == 1
+    env.backend.no_profile.clear()
+    uniform(await checkout(env), 202, True)

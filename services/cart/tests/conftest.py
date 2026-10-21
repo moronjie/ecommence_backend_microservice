@@ -29,6 +29,8 @@ class Backend:
         self.calls: list[str] = []
         self.inventory_down = False
         self.user_service_down = False
+        self.emails: dict[str, str] = {}
+        self.no_profile: set[str] = set()
         self.addresses: dict[str, list[dict[str, Any]]] = {}
         self.product_service_down = False
 
@@ -42,6 +44,14 @@ class Backend:
             if product is None or not product["is_active"]:
                 return httpx.Response(404, json={"success": False, "data": {}})
             return httpx.Response(200, json={"success": True, "data": product})
+        if path == "/api/v1/users/me":
+            if self.user_service_down:
+                raise httpx.ConnectError("down")
+            user = request.headers["x-user-id"]
+            if user in self.no_profile:
+                return httpx.Response(404, json={"success": False, "data": {}})
+            email = self.emails.get(user, f"{user}@example.com")
+            return httpx.Response(200, json={"success": True, "data": {"email": email}})
         if path == "/api/v1/users/me/addresses":
             if self.user_service_down:
                 raise httpx.ConnectError("down")
