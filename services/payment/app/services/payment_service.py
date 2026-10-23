@@ -82,6 +82,8 @@ class PaymentService:
         return {
             "order_id": str(payment.order_id),
             "payment_id": str(payment.id),
+            "user_id": str(payment.user_id),
+            "email": payment.email,  # lets the notification service write to the customer
             "amount_cents": payment.amount_cents,
             "currency": payment.currency,
             **extra,

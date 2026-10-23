@@ -72,7 +72,14 @@ async def test_full_life_of_an_order(env):
 
     await env.paid(order_id)
     assert await env.status(order_id) == "confirmed"
-    assert len(await env.published("order.confirmed")) == 1
+    (confirmed,) = await env.published("order.confirmed")
+    assert confirmed["email"] == "ada@example.com"
+    assert sorted(
+        (i["name"], i["quantity"], i["unit_price_cents"]) for i in confirmed["items"]
+    ) == [
+        ("Mug", 2, 1000),
+        ("Pan", 1, 4500),
+    ]  # the receipt
 
     for action, expected, topic in (
         ("ship", "shipped", "order.shipped"),
@@ -81,7 +88,9 @@ async def test_full_life_of_an_order(env):
         resp = await env.client.post(f"/api/v1/orders/{order_id}/{action}", headers=ADMIN)
         assert resp.status_code == 200, resp.text
         assert await env.status(order_id) == expected
-        assert len(await env.published(topic)) == 1
+        (event,) = await env.published(topic)
+        if action == "ship":
+            assert event["shipping_address"]["city"] == "London"
 
     assert await history(env, order_id) == [
         (None, "pending"),

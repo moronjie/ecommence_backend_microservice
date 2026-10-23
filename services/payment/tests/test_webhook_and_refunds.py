@@ -110,6 +110,7 @@ async def test_refund_requested_sends_the_full_amount_back(env):
     assert (await env.payment(order_id)).status == "refunded"
     (event,) = await env.published("payment.refunded")
     assert event["order_id"] == order_id and event["amount_cents"] == 6500
+    assert event["email"] == "ada@example.com" and event["user_id"]  # who to tell
 
 
 async def test_refunding_twice_refunds_once(env):

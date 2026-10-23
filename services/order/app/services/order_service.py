@@ -78,6 +78,7 @@ class OrderService:
             "status": order.status,
             "currency": order.currency,
             "total_cents": order.total_cents,
+            "email": order.customer_email,  # lets the notification service write to the customer
             **extra,
         }
 
@@ -100,8 +101,13 @@ class OrderService:
         if to == CANCELLED:
             order.cancel_reason = reason
         extra: dict[str, Any] = {"reason": reason} if to == CANCELLED else {}
-        if to == AWAITING_PAYMENT:
-            extra["email"] = order.customer_email  # the payment service bills this address
+        if to == CONFIRMED:  # what the receipt email lists
+            extra["items"] = [
+                {"name": i.name, "quantity": i.quantity, "unit_price_cents": i.unit_price_cents}
+                for i in order.items
+            ]
+        if to in (SHIPPED, DELIVERED):  # where it is going
+            extra["shipping_address"] = order.shipping_address
         add_event(
             self.session,
             EVENT_FOR_STATUS[to],
