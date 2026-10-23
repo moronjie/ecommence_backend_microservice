@@ -102,7 +102,7 @@ Every endpoint (success and error) returns:
 - **Quality gates**: ruff, mypy, pytest in pre-commit and CI; Dockerfiles multi-stage, non-root.
 
 ## Phases (one service per phase)
-**Status:** Phase 0 done, Phase 1 (gateway) done, Phase 2 (auth) done, Phase 3 (user) done, Phase 4 (product) done, Phase 5 (inventory) done, Phase 6 (cart) done, Phase 7 (order) done, Phase 8 (payment, Paystack/GHS) done (its Postgres concurrency test is written but has not been run; needs a real Postgres). Both verified end to end without Docker (Kafka transport itself not yet exercised). Docker stack not yet run (Docker Hub unreachable on dev machine).
+**Status:** Phase 0 done, Phase 1 (gateway) done, Phase 2 (auth) done, Phase 3 (user) done, Phase 4 (product) done, Phase 5 (inventory) done, Phase 6 (cart) done, Phase 7 (order) done, Phase 8 (payment, Paystack/GHS) done, Phase 9 (notification, email only) done (its Postgres concurrency test is written but has not been run; needs a real Postgres). Both verified end to end without Docker (Kafka transport itself not yet exercised). Docker stack not yet run (Docker Hub unreachable on dev machine).
 
 Each phase ends with: Alembic migration, tests passing, Dockerfile + compose entry, gateway route, README section, and a Postman/`.http` collection entry.
 

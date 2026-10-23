@@ -22,6 +22,7 @@ jobs:
       - run: cd services/cart && mypy app
       - run: cd services/order && mypy app
       - run: cd services/payment && mypy app
+      - run: cd services/notification && mypy app
       - run: pytest libs/common/tests
       - run: cd services/_template && pytest
       - run: cd services/gateway && pytest
@@ -32,3 +33,4 @@ jobs:
       - run: cd services/cart && pytest
       - run: cd services/order && pytest
       - run: cd services/payment && pytest
+      - run: cd services/notification && pytest

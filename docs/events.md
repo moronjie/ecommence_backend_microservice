@@ -33,6 +33,15 @@ and the cart is kept. `checkout_id` is derived from the cart's contents, so a re
 SAME id. **The order service must treat `checkout_id` as an idempotency key** (create at most one order per id).
 Prices are the current ones at checkout time; stock was confirmed with the inventory service just before.
 
+### Notification service (email only)
+Consumes `user.registered`, `order.confirmed`, `order.cancelled`, `order.shipped`, `order.delivered` and
+`payment.refunded`, and publishes nothing. It needs no other service because the events carry what an email needs:
+`email` and `user_id` on every order and payment event, `items` (the receipt) on `order.confirmed`,
+`shipping_address` on `order.shipped` / `order.delivered`, and `reason` on `order.cancelled`.
+There is deliberately no email for `payment.failed`: it always leads to `order.cancelled`, whose email already explains
+why. One email is sent per milestone per order (`dedupe_key`, e.g. `order_confirmed:<order id>`) even if an event is
+re-issued.
+
 ### Payment service
 Consumes `order.payment_requested` (`{order_id, user_id, total_cents, currency, email}`) and `order.refund_requested`.
 Publishes (key = order_id): `payment.completed` `{order_id, payment_id, amount_cents, currency, channel, reference}`,

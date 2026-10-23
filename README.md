@@ -155,3 +155,29 @@ fake provider.
 
 Not built yet: a customer-facing "pay now" page (your frontend redirects to the link), partial refunds, and
 restricting the webhook to Paystack's IP addresses.
+
+## Notification service (Phase 9) - email only
+`services/notification` (port 8008, route `/api/v1/notifications`). It listens for events and emails the customer:
+a welcome message, **order confirmed** (a receipt listing the items and total in cedis), **cancelled** (with the reason
+in plain language), **shipped** (with the delivery address), **delivered**, and **refund**. It sends no separate email for
+a failed payment, since the cancellation email already explains it.
+
+An event only *writes* the email to the database; a background worker sends it. If the mail server is down the email waits
+and is retried with growing delays (30 s, 1 min, 2 min ... up to 5 attempts), and after that it is marked `failed`, kept,
+and visible to admins, who can fix the cause and `POST /api/v1/notifications/{id}/retry`. One email is sent per milestone
+per order, even if the event is delivered twice. Addresses that are missing or invalid are recorded as `failed` rather than
+lost, and refused addresses are not retried. Customers can read their own emails (`GET /`, `GET /{id}`); admins see all of
+them with delivery details (`?status=failed`, `?kind=`, `?owner=`). Everything customer-supplied is HTML-escaped in the email.
+
+**Trying it.** `EMAIL_PROVIDER=console` (the default outside Docker) only prints each email in the log. With Docker, compose
+starts **Mailpit**, a fake mail server: the emails really go over SMTP and you read them at http://localhost:8025.
+
+**Sending real email.** Any provider that offers SMTP works (Brevo, Mailgun, SendGrid, Resend, Gmail, your hosting company).
+Set `EMAIL_PROVIDER=smtp`, `SMTP_HOST`, `SMTP_PORT` (587 for most), `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS=true`,
+and `FROM_ADDRESS` to an address on a domain you own. Before sending to real customers, set up SPF/DKIM/DMARC for that
+domain with your provider, or your emails will land in spam. Also set `SHOP_NAME` and `SUPPORT_EMAIL`.
+
+Known limits: delivery is "at least once", so if the service crashes in the instant between the mail server accepting an
+email and us recording it, that one email can be sent twice after the restart. There is no unsubscribe or marketing
+preference yet, because nothing marketing-related is sent (only messages about the customer's own orders and account).
+Email only: no SMS or WhatsApp.
