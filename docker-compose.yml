@@ -82,6 +82,7 @@ services:
       CART_URL: http://cart:8000
       ORDER_URL: http://order:8000
       PAYMENT_URL: http://payment:8000
+      NOTIFICATION_URL: http://notification:8000
     depends_on:
       redis: { condition: service_healthy }
 
@@ -182,6 +183,36 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
+
+  mailpit:
+    # A fake mail server for development: it accepts every email and shows it in a web page
+    # instead of delivering it. Never used in production.
+    image: axllent/mailpit:latest
+
+  notification:
+    build:
+      context: .
+      dockerfile: services/notification/Dockerfile
+    environment:
+      SERVICE_NAME: notification-service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/notification_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      # Development default: emails land in Mailpit. In production point these at your real
+      # SMTP provider (EMAIL_PROVIDER=smtp, SMTP_HOST, SMTP_PORT=587, SMTP_USERNAME,
+      # SMTP_PASSWORD, SMTP_STARTTLS=true) and set FROM_ADDRESS to an address you own.
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      FROM_ADDRESS: ${FROM_ADDRESS:-shop@example.com}
+      SHOP_NAME: ${SHOP_NAME:-Our Shop}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:-support@example.com}
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      mailpit: { condition: service_started }
 
   template:
     build:

@@ -11,6 +11,7 @@ TOPICS=(
   inventory.reserved.dlq inventory.failed.dlq inventory.released.dlq
   payment.completed.dlq payment.failed.dlq
   payment.completed payment.failed payment.refunded
+  user.registered.dlq order.confirmed.dlq order.shipped.dlq order.delivered.dlq payment.refunded.dlq
   order.payment_requested.dlq order.refund_requested.dlq
   cart.checked_out cart.checked_out.dlq
   user.registered.dlq

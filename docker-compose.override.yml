@@ -22,5 +22,9 @@ services:
     ports: ["8006:8000"]
   payment:
     ports: ["8007:8000"]
+  notification:
+    ports: ["8008:8000"]
+  mailpit:
+    ports: ["8025:8025", "1025:1025"]  # 8025 is the web page showing the emails
   template:
     ports: ["8100:8000"]
