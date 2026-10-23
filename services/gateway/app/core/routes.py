@@ -65,6 +65,7 @@ def build_routes(s: Settings) -> list[Route]:
             s.payment_url,
             public=(PublicRule("/api/v1/payments/webhooks", POST),),
         ),
+        Route("notification", "/api/v1/notifications", s.notification_url),
         # Dev stub so the gateway can be exercised before the real services exist
         Route(
             "template",

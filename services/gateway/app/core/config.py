@@ -27,6 +27,7 @@ class Settings(BaseServiceSettings):
     cart_url: str = "http://localhost:8005"
     order_url: str = "http://localhost:8006"
     payment_url: str = "http://localhost:8007"
+    notification_url: str = "http://localhost:8008"
     template_url: str = "http://localhost:8100"
 
 
