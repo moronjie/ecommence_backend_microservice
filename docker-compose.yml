@@ -1,6 +1,3 @@
-# Only the gateway publishes a port here. Services reach each other by name on the private
-# network. Local-development ports live in docker-compose.override.yml (loaded automatically by
-# `docker compose up`; use `-f docker-compose.yml` alone for a locked-down run).
 name: ecommerce
 
 services:
@@ -83,9 +80,15 @@ services:
     ports: ["8000:8000"]
     environment:
       SERVICE_NAME: gateway
+      ENVIRONMENT: ${ENVIRONMENT:-local}  
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}  
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_PUBLIC_KEY_FILE: ${JWT_PUBLIC_KEY_FILE:-}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
-      # 100 requests a minute per user. Raise it for load tests: RATE_LIMIT_REQUESTS=1000000
       RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-100}
+      LOGIN_RATE_LIMIT: ${LOGIN_RATE_LIMIT:-10}  
+      REGISTER_RATE_LIMIT: ${REGISTER_RATE_LIMIT:-5}
       REDIS_URL: redis://redis:6379/0
       TEMPLATE_URL: http://template:8000
       AUTH_URL: http://auth:8000
@@ -96,6 +99,8 @@ services:
       ORDER_URL: http://order:8000
       PAYMENT_URL: http://payment:8000
       NOTIFICATION_URL: http://notification:8000
+    volumes:
+      - ./.keys/gateway:/run/keys:ro
     depends_on:
       redis: { condition: service_healthy }
 
@@ -105,12 +110,19 @@ services:
       dockerfile: services/auth/Dockerfile
     environment:
       SERVICE_NAME: auth-service
+      ENVIRONMENT: ${ENVIRONMENT:-local}  
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}  
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_PRIVATE_KEY_FILE: ${JWT_PRIVATE_KEY_FILE:-}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/auth_db
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    volumes:
+      - ./.keys/auth:/run/keys:ro
     depends_on:
       postgres: { condition: service_healthy }
       db-init: { condition: service_completed_successfully }
@@ -123,6 +135,9 @@ services:
       dockerfile: services/user/Dockerfile
     environment:
       SERVICE_NAME: user-service
+      ENVIRONMENT: ${ENVIRONMENT:-local}  
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}  
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/user_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -136,6 +151,9 @@ services:
       dockerfile: services/product/Dockerfile
     environment:
       SERVICE_NAME: product-service
+      ENVIRONMENT: ${ENVIRONMENT:-local}  
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}  
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/product_db
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
@@ -151,6 +169,9 @@ services:
       dockerfile: services/inventory/Dockerfile
     environment:
       SERVICE_NAME: inventory-service
+      ENVIRONMENT: ${ENVIRONMENT:-local}  
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
+      METRICS_TOKEN: ${METRICS_TOKEN:-} 
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/inventory_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -164,6 +185,9 @@ services:
       dockerfile: services/cart/Dockerfile
     environment:
       SERVICE_NAME: cart-service
+      ENVIRONMENT: ${ENVIRONMENT:-local}  
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}  
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       PRODUCT_URL: http://product:8000
@@ -179,6 +203,9 @@ services:
       dockerfile: services/order/Dockerfile
     environment:
       SERVICE_NAME: order-service
+      ENVIRONMENT: ${ENVIRONMENT:-local}  
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}  
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/order_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -192,9 +219,11 @@ services:
       dockerfile: services/payment/Dockerfile
     environment:
       SERVICE_NAME: payment-service
+      ENVIRONMENT: ${ENVIRONMENT:-local}  
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}  
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/payment_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      # "fake" needs no account. For Paystack: PROVIDER=paystack and PAYSTACK_SECRET_KEY=sk_test_...
       PROVIDER: ${PAYMENT_PROVIDER:-fake}
       PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
       PAYMENT_CALLBACK_URL: ${PAYMENT_CALLBACK_URL:-}
@@ -204,8 +233,6 @@ services:
       kafka: { condition: service_healthy }
 
   mailpit:
-    # A fake mail server for development: it accepts every email and shows it in a web page
-    # instead of delivering it. Never used in production.
     image: axllent/mailpit:latest
 
   notification:
@@ -214,11 +241,11 @@ services:
       dockerfile: services/notification/Dockerfile
     environment:
       SERVICE_NAME: notification-service
+      ENVIRONMENT: ${ENVIRONMENT:-local}  
+      INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}  
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/notification_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      # Development default: emails land in Mailpit. In production point these at your real
-      # SMTP provider (EMAIL_PROVIDER=smtp, SMTP_HOST, SMTP_PORT=587, SMTP_USERNAME,
-      # SMTP_PASSWORD, SMTP_STARTTLS=true) and set FROM_ADDRESS to an address you own.
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
@@ -233,6 +260,24 @@ services:
       db-init: { condition: service_completed_successfully }
       kafka: { condition: service_healthy }
       mailpit: { condition: service_started }
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - gateway
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
 
   template:
     build:
