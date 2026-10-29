@@ -34,3 +34,81 @@ jobs:
       - run: cd services/order && pytest
       - run: cd services/payment && pytest
       - run: cd services/notification && pytest
+
+  # The unit tests above use SQLite and fake Redis/Kafka. These two jobs use the real thing.
+  postgres:
+    name: migrations and locking on real Postgres
+    runs-on: ubuntu-latest
+    needs: test
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e "libs/common[dev]" -r requirements-dev.txt
+      - name: Create the databases
+        run: |
+          for db in auth_db user_db product_db inventory_db order_db payment_db notification_db inventory_test_db; do
+            PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE $db"
+          done
+      - name: Every migration applies, matches the models, rolls back and applies again
+        run: python scripts/check_migrations.py
+      - name: Inventory never oversells under concurrent orders
+        run: |
+          cd services/inventory
+          TEST_POSTGRES_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/inventory_test_db             pytest tests/test_concurrency_postgres.py -v
+
+  # A real purchase through the whole system: gateway, every service, Postgres, Redis, Kafka, email.
+  e2e:
+    name: end-to-end checkout on the real stack
+    runs-on: ubuntu-latest
+    needs: test
+    timeout-minutes: 30
+    env:
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: Adm1n-Passw0rd-for-CI!
+      RATE_LIMIT_REQUESTS: "1000000"
+      LOGIN_RATE_LIMIT: "1000"
+      REGISTER_RATE_LIMIT: "1000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install httpx pytest
+      - name: Create signing keys (so the stack runs with RS256, like production)
+        run: |
+          pip install -e libs/common
+          python scripts/generate_keys.py
+          echo "JWT_ALGORITHM=RS256" >> .env
+          echo "JWT_PRIVATE_KEY_FILE=/run/keys/jwt_private.pem" >> .env
+          echo "JWT_PUBLIC_KEY_FILE=/run/keys/jwt_public.pem" >> .env
+      - name: Start the shop
+        run: docker compose up -d --build
+      - name: Wait until every service is healthy
+        run: |
+          for i in $(seq 1 90); do
+            curl -sf http://localhost:8000/health/services && exit 0
+            sleep 3
+          done
+          echo "the stack did not become healthy"; docker compose ps; exit 1
+      - name: End-to-end tests
+        env:
+          E2E_BASE_URL: http://localhost:8000
+          E2E_ADMIN_EMAIL: admin@example.com
+          E2E_ADMIN_PASSWORD: Adm1n-Passw0rd-for-CI!
+          E2E_PUBLIC_KEY_FILE: .keys/gateway/jwt_public.pem
+        run: pytest tests/e2e -v
+      - name: Show the service logs if something failed
+        if: failure()
+        run: docker compose logs --tail=150
+      - run: docker compose down -v
+        if: always()
