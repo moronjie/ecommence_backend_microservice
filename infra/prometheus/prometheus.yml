@@ -1,0 +1,28 @@
+# Prometheus collects /metrics from every service, over the internal Docker network.
+global:
+  scrape_interval: 10s
+
+scrape_configs:
+  - job_name: shop
+    metrics_path: /metrics
+    # If you set METRICS_TOKEN on the services (required in production), give Prometheus the same
+    # token through a mounted file:
+    # authorization:
+    #   credentials_file: /etc/prometheus/metrics_token
+    static_configs:
+      - targets:
+          - gateway:8000
+          - auth:8000
+          - user:8000
+          - product:8000
+          - inventory:8000
+          - cart:8000
+          - order:8000
+          - payment:8000
+          - notification:8000
+    relabel_configs:
+      # show "auth" instead of "auth:8000" in dashboards
+      - source_labels: [__address__]
+        regex: "([^:]+):.*"
+        target_label: instance
+        replacement: "$1"
