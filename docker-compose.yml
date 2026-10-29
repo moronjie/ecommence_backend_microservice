@@ -84,6 +84,8 @@ services:
     environment:
       SERVICE_NAME: gateway
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      # 100 requests a minute per user. Raise it for load tests: RATE_LIMIT_REQUESTS=1000000
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-100}
       REDIS_URL: redis://redis:6379/0
       TEMPLATE_URL: http://template:8000
       AUTH_URL: http://auth:8000
