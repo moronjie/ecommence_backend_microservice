@@ -11,12 +11,23 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./infra/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  db-init:
+    image: postgres:16-alpine
+    depends_on:
+      postgres: { condition: service_healthy }
+    volumes:
+      - ./infra/postgres/ensure-databases.sh:/ensure-databases.sh:ro
+    entrypoint: ["sh", "/ensure-databases.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
 
   redis:
     image: redis:7-alpine
@@ -100,6 +111,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     depends_on:
       postgres: { condition: service_healthy }
+      db-init: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
       kafka: { condition: service_healthy }
 
@@ -113,6 +125,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
       postgres: { condition: service_healthy }
+      db-init: { condition: service_completed_successfully }
       kafka: { condition: service_healthy }
 
   product:
@@ -126,6 +139,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
       postgres: { condition: service_healthy }
+      db-init: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
       kafka: { condition: service_healthy }
 
@@ -139,6 +153,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
       postgres: { condition: service_healthy }
+      db-init: { condition: service_completed_successfully }
       kafka: { condition: service_healthy }
 
   cart:
@@ -166,6 +181,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
       postgres: { condition: service_healthy }
+      db-init: { condition: service_completed_successfully }
       kafka: { condition: service_healthy }
 
   payment:
@@ -182,6 +198,7 @@ services:
       PAYMENT_CALLBACK_URL: ${PAYMENT_CALLBACK_URL:-}
     depends_on:
       postgres: { condition: service_healthy }
+      db-init: { condition: service_completed_successfully }
       kafka: { condition: service_healthy }
 
   mailpit:
@@ -211,6 +228,7 @@ services:
       SUPPORT_EMAIL: ${SUPPORT_EMAIL:-support@example.com}
     depends_on:
       postgres: { condition: service_healthy }
+      db-init: { condition: service_completed_successfully }
       kafka: { condition: service_healthy }
       mailpit: { condition: service_started }
 
