@@ -27,6 +27,7 @@ def create_app(
     publisher: EventPublisher | None = None,
 ) -> FastAPI:
     """Dependencies can be injected (tests); otherwise the lifespan builds real ones."""
+    settings.validate_keys()
 
     async def db_ready() -> None:
         async with app.state.session_factory() as session:

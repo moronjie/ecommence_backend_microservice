@@ -1,5 +1,7 @@
+from typing import Annotated
+
 from ecom_common import success_response
-from fastapi import APIRouter
+from fastapi import APIRouter, Header
 
 from app.core.dependencies import AuthServiceDep, CurrentUserId
 from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, UserOut
@@ -26,8 +28,16 @@ async def refresh(body: RefreshRequest, service: AuthServiceDep):
 
 
 @router.post("/logout")
-async def logout(body: RefreshRequest, service: AuthServiceDep, user_id: CurrentUserId):
-    await service.logout(body.refresh_token, user_id)
+async def logout(
+    body: RefreshRequest,
+    service: AuthServiceDep,
+    user_id: CurrentUserId,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    access_token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        access_token = authorization[7:].strip()
+    await service.logout(body.refresh_token, user_id, access_token)
     return success_response(message="Logged out")
 
 

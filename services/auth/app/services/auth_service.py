@@ -1,5 +1,4 @@
-"""Business rules for registration, login, refresh and logout."""
-
+import logging
 import time
 import uuid
 from datetime import timedelta
@@ -20,9 +19,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
+from app.errors import TooManyAttempts
 from app.models.user import ADMIN, CUSTOMER, User
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import RegisterRequest, TokenPair
+
+logger = logging.getLogger(__name__)
 
 # Verified when the email is unknown, so "no such user" costs as long as "wrong password"
 _DUMMY_HASH = hash_password("not-a-real-password")
@@ -81,7 +83,7 @@ class AuthService:
     def _issue(self, user: User) -> TokenPair:
         s = self.settings
         access_seconds = s.access_token_minutes * 60
-        common = {"secret": s.jwt_secret, "algorithm": s.jwt_algorithm, "role": user.role}
+        common = {"secret": s.signing_key, "algorithm": s.jwt_algorithm, "role": user.role}
         return TokenPair(
             access_token=create_token(
                 str(user.id),
@@ -98,13 +100,16 @@ class AuthService:
             expires_in=access_seconds,
         )
 
-    def _decode_refresh(self, token: str) -> dict:
+    def _decode(self, token: str, expected_type: str) -> dict:
         return decode_token(
             token,
-            secret=self.settings.jwt_secret,
+            secret=self.settings.verification_key,
             algorithm=self.settings.jwt_algorithm,
-            expected_type=REFRESH,
+            expected_type=expected_type,
         )
+
+    def _decode_refresh(self, token: str) -> dict:
+        return self._decode(token, REFRESH)
 
     async def _revoke(self, claims: dict) -> bool:
         """Mark a refresh token as used. False if it was already revoked (atomic)."""
@@ -112,11 +117,52 @@ class AuthService:
         return bool(await self.redis.set(f"auth:revoked:{claims['jti']}", "1", ex=ttl, nx=True))
 
     # ---- login / refresh / logout -------------------------------------------------------
+    # ---- guarding against password guessing ------------------------------------------
+    # Failures are counted per email, whether or not that account exists, so the lockout never
+    # reveals which emails are registered.
+    @staticmethod
+    def _failures_key(email: str) -> str:
+        return f"auth:login-failures:{email}"
+
+    async def _ensure_not_locked(self, email: str) -> None:
+        key = self._failures_key(email)
+        try:
+            count = int(await self.redis.get(key) or 0)
+            if count >= self.settings.login_max_failures:
+                wait = max(1, await self.redis.ttl(key))
+                raise TooManyAttempts(
+                    f"Too many failed attempts. Try again in {wait // 60 + 1} minute(s).",
+                    message="Login locked",
+                    headers={"Retry-After": str(wait)},
+                )
+        except TooManyAttempts:
+            raise
+        except Exception:  # noqa: BLE001 - if Redis is down, logins keep working
+            logger.warning("Login lockout check unavailable", exc_info=True)
+
+    async def _record_failure(self, email: str) -> None:
+        key = self._failures_key(email)
+        try:
+            if await self.redis.incr(key) == 1:
+                await self.redis.expire(key, self.settings.login_lockout_seconds)
+        except Exception:  # noqa: BLE001
+            logger.warning("Could not record a failed login", exc_info=True)
+
+    async def _clear_failures(self, email: str) -> None:
+        try:
+            await self.redis.delete(self._failures_key(email))
+        except Exception:  # noqa: BLE001
+            logger.warning("Could not clear failed logins", exc_info=True)
+
     async def login(self, email: str, password: str) -> TokenPair:
-        user = await self.users.get_by_email(email.strip().lower())
+        email = email.strip().lower()
+        await self._ensure_not_locked(email)  # before the (expensive) password check
+        user = await self.users.get_by_email(email)
         valid = await verify_password_async(password, user.password_hash if user else _DUMMY_HASH)
         if not (user and valid and user.is_active):
+            await self._record_failure(email)
             raise Unauthorized(_BAD_LOGIN, message="Login failed")
+        await self._clear_failures(email)
         return self._issue(user)
 
     async def refresh(self, refresh_token: str) -> TokenPair:
@@ -129,11 +175,23 @@ class AuthService:
             raise Unauthorized("Account is not available")
         return self._issue(user)
 
-    async def logout(self, refresh_token: str, caller_id: str) -> None:
+    async def logout(
+        self, refresh_token: str, caller_id: str, access_token: str | None = None
+    ) -> None:
         claims = self._decode_refresh(refresh_token)
         if claims["sub"] != caller_id:
             raise Forbidden("This token belongs to another user")
         await self._revoke(claims)  # already revoked is fine: logout is idempotent
+
+        # Also cut off the access token used for this request. The gateway checks for it, so it
+        # stops working at once instead of living on for the rest of its 15 minutes.
+        if access_token:
+            try:
+                access = self._decode(access_token, ACCESS)
+            except Unauthorized:
+                return
+            if access["sub"] == caller_id:
+                await self._revoke(access)
 
     async def get_user(self, user_id: str) -> User:
         try:
