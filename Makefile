@@ -61,3 +61,7 @@ keys:
 # 30 seconds of 20 shoppers. Start the stack with RATE_LIMIT_REQUESTS=1000000 first.
 loadtest:
 	$(PY) loadtest/run.py --admin-email $(ADMIN_EMAIL) --admin-password $(ADMIN_PASSWORD) --users 20 --duration 30
+
+# Rebuilds docs/postman/shop.postman_collection.json from the running gateway
+postman:
+	$(PY) scripts/make_postman_collection.py

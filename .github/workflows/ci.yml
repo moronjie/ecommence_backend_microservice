@@ -24,6 +24,7 @@ jobs:
       - run: cd services/payment && mypy app
       - run: cd services/notification && mypy app
       - run: pytest libs/common/tests
+      - run: pytest tests/unit
       - run: cd services/_template && pytest
       - run: cd services/gateway && pytest
       - run: cd services/auth && pytest
