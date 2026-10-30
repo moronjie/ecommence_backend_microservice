@@ -12,11 +12,27 @@ class PublicRule:
 
 
 @dataclass(frozen=True)
+class RateRule:
+    """An extra, stricter limit per client IP on one path (on top of the general limit)."""
+
+    path_prefix: str
+    limit: int
+    window_seconds: int
+    methods: frozenset[str] | None = None
+
+    def applies(self, method: str, path: str) -> bool:
+        return path.startswith(self.path_prefix) and (
+            self.methods is None or method in self.methods
+        )
+
+
+@dataclass(frozen=True)
 class Route:
     name: str
     prefix: str
     upstream: str
     public: tuple[PublicRule, ...] = field(default_factory=tuple)
+    limits: tuple[RateRule, ...] = field(default_factory=tuple)
 
     def is_public(self, method: str, path: str) -> bool:
         return any(
@@ -39,6 +55,18 @@ def build_routes(s: Settings) -> list[Route]:
                 PublicRule("/api/v1/auth/register"),
                 PublicRule("/api/v1/auth/login"),
                 PublicRule("/api/v1/auth/refresh"),
+            ),
+            # Slow down password guessing and mass account creation, per IP
+            limits=(
+                RateRule(
+                    "/api/v1/auth/login", s.login_rate_limit, s.auth_rate_window_seconds, POST
+                ),
+                RateRule(
+                    "/api/v1/auth/register", s.register_rate_limit, s.auth_rate_window_seconds, POST
+                ),
+                RateRule(
+                    "/api/v1/auth/refresh", s.refresh_rate_limit, s.auth_rate_window_seconds, POST
+                ),
             ),
         ),
         Route("user", "/api/v1/users", s.user_url),

@@ -11,11 +11,14 @@ from ecom_common.redis import SlidingWindowRateLimiter, create_redis
 from ecom_common.security import decode_token
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import HTMLResponse, JSONResponse
 from redis.asyncio import Redis
 
 from app.core.config import Settings
 from app.core.config import settings as default_settings
 from app.core.routes import build_routes, match_route
+from app.docs import DocsBuilder
 from app.errors import TooManyRequests
 from app.proxy import build_upstream_headers, forward
 from app.resilience import BreakerRegistry
@@ -32,6 +35,7 @@ def create_app(
     redis_client: Redis | None = None,
 ) -> FastAPI:
     """Build the gateway. Clients can be injected (tests); otherwise lifespan creates them."""
+    settings.validate_keys()
     routes = build_routes(settings)
 
     async def redis_ready() -> None:
@@ -53,7 +57,14 @@ def create_app(
         for close in owned:
             await close()
 
-    app = create_service_app(settings, lifespan=lifespan, readiness_checks={"redis": redis_ready})
+    # verify_identity=False: the gateway SIGNS identities, so it must not verify them
+    app = create_service_app(
+        settings,
+        lifespan=lifespan,
+        readiness_checks={"redis": redis_ready},
+        verify_identity=False,
+        docs=False,  # the gateway serves ONE combined page instead (below)
+    )
     app.state.http = http_client
     app.state.redis = redis_client
     app.state.limiter = SlidingWindowRateLimiter(redis_client) if redis_client else None
@@ -94,12 +105,43 @@ def create_app(
         down = ", ".join(n for n, s in statuses.items() if s == "down")
         return error_response("Some services are down", f"Down: {down}", 503, statuses)
 
+    if settings.docs_active:
+        docs = DocsBuilder(routes)
+
+        @app.get("/openapi.json", include_in_schema=False)
+        async def combined_openapi() -> JSONResponse:
+            """Every service's endpoints, merged. Services that are down are listed, not fatal."""
+            return JSONResponse(await docs.spec(app.state.http))
+
+        @app.get("/docs", include_in_schema=False)
+        async def combined_docs() -> HTMLResponse:
+            return get_swagger_ui_html(
+                openapi_url="/openapi.json",
+                title="Shop API",
+                swagger_ui_parameters={
+                    "persistAuthorization": True,  # keep the pasted token across page reloads
+                    "displayRequestDuration": True,
+                    "tryItOutEnabled": True,
+                    "docExpansion": "list",
+                },
+            )
+
+    async def _revoked(claims: dict) -> bool:
+        """A logged-out access token stays valid until it expires, unless we check for it here.
+        The auth service marks its id in Redis on logout (see AuthService.logout)."""
+        try:
+            return bool(await app.state.redis.exists(f"auth:revoked:{claims['jti']}"))
+        except Exception:  # noqa: BLE001 - fail open, like the rate limiter
+            logger.warning("Revocation check unavailable, allowing token", exc_info=True)
+            return False
+
     @app.api_route("/{full_path:path}", methods=METHODS, include_in_schema=False)
     async def gateway(request: Request, full_path: str) -> Response:
         path = request.url.path
         route = match_route(routes, path)
         if route is None:
             raise NotFound(f"No service handles {path}", message="Route not found")
+        request.scope["metrics_route"] = f"proxy:{route.name}"  # for the metrics label
 
         # Who is calling? A bad token only matters if the route is protected.
         user, token_error = None, "Missing bearer token"
@@ -108,9 +150,11 @@ def create_app(
             try:
                 claims = decode_token(
                     auth[7:].strip(),
-                    secret=settings.jwt_secret,
+                    secret=settings.verification_key,
                     algorithm=settings.jwt_algorithm,
                 )
+                if await _revoked(claims):
+                    raise Unauthorized("Token has been revoked", message="Invalid token")
                 user = {"id": str(claims["sub"]), "role": str(claims.get("role", "customer"))}
             except Unauthorized as exc:
                 token_error = exc.error_message
@@ -140,10 +184,30 @@ def create_app(
                     headers={**rate_headers, "Retry-After": str(result.retry_after)},
                 )
 
+        # Stricter per-IP limits on the routes attackers hammer (login, sign-up)
+        client_ip = request.client.host if request.client else "unknown"
+        for rule in route.limits:
+            if not rule.applies(request.method, path):
+                continue
+            try:
+                hit = await app.state.limiter.hit(
+                    f"route:{rule.path_prefix}:{client_ip}", rule.limit, rule.window_seconds
+                )
+            except Exception:  # noqa: BLE001 - Redis trouble must not take the gateway down
+                logger.warning("Route limiter unavailable, allowing request", exc_info=True)
+                continue
+            if not hit.allowed:
+                raise TooManyRequests(
+                    f"Too many attempts: limit is {rule.limit} per {rule.window_seconds}s",
+                    headers={"Retry-After": str(hit.retry_after)},
+                )
+
         if user is None and not route.is_public(request.method, path):
             raise Unauthorized(token_error)
 
-        headers = build_upstream_headers(request, request_id_ctx.get(), user)
+        headers = build_upstream_headers(
+            request, request_id_ctx.get(), user, settings.internal_auth_secret
+        )
         response = await forward(
             client=app.state.http,
             breaker=app.state.breakers.get(route.name),

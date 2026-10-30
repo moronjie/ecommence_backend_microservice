@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 import httpx
+from ecom_common import identity as ecom_identity
 from ecom_common.middleware import REQUEST_ID_HEADER
 from fastapi import Request, Response
 
@@ -21,13 +22,17 @@ HOP_BY_HOP = {
     "transfer-encoding",
     "upgrade",
 }
-# Identity headers are set by the gateway only. A client must never be able to spoof them.
-IDENTITY_HEADERS = {"x-user-id", "x-user-role"}
+# Identity headers are set by the gateway only. A client must never be able to spoof them,
+# including the signature and timestamp that prove they are genuine.
+IDENTITY_HEADERS = set(ecom_identity.IDENTITY_HEADERS)
 IDEMPOTENT = {"GET", "HEAD"}
 
 
 def build_upstream_headers(
-    request: Request, request_id: str, user: dict[str, str] | None
+    request: Request,
+    request_id: str,
+    user: dict[str, str] | None,
+    internal_secret: str = "",
 ) -> dict[str, str]:
     headers = {
         k: v
@@ -36,7 +41,14 @@ def build_upstream_headers(
         not in HOP_BY_HOP | IDENTITY_HEADERS | {"host", "content-length", REQUEST_ID_HEADER.lower()}
     }
     headers[REQUEST_ID_HEADER] = request_id
-    if user:
+    if user and internal_secret:
+        # signed, so a service can tell this really came from the gateway (and for THIS request)
+        headers.update(
+            ecom_identity.sign_identity(
+                internal_secret, user["id"], user["role"], request.method, request.url.path
+            )
+        )
+    elif user:  # development without INTERNAL_AUTH_SECRET: plain headers
         headers["X-User-Id"] = user["id"]
         headers["X-User-Role"] = user["role"]
     return headers
