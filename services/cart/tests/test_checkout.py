@@ -171,3 +171,31 @@ async def test_checkout_needs_a_profile_to_know_the_email(env):
     assert env.publisher.events == [] and len((await env.view())["items"]) == 1
     env.backend.no_profile.clear()
     uniform(await checkout(env), 202, True)
+
+
+# ---- signed identity on the cart's own calls to other services ----------------------------
+async def test_calls_to_other_services_carry_a_signed_identity():
+    import httpx
+    from app.clients import InventoryClient, UserClient
+    from ecom_common.identity import identity_is_valid
+
+    secret = "internal-secret-that-is-long-enough-for-hmac"
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.path.endswith("availability"):
+            return httpx.Response(200, json={"data": {"items": []}})
+        return httpx.Response(200, json={"data": {"email": "a@b.co", "items": []}})
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    await InventoryClient(http, "http://inventory", secret).availability(["p1"], "user-9")
+    users = UserClient(http, "http://user", secret)
+    await users.email("user-9")
+    await users.address("user-9", "addr-1")
+
+    assert len(seen) == 3
+    for request in seen:
+        headers = {k.lower(): v for k, v in request.headers.items()}
+        assert headers["x-user-id"] == "user-9"
+        assert identity_is_valid(secret, headers, request.method, request.url.path)

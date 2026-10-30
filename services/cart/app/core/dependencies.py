@@ -15,8 +15,8 @@ def get_cart_service(request: Request) -> CartService:
         CartStore(state.redis, settings.cart_ttl_days * 86400),
         ProductStore(state.redis),
         ProductClient(state.http, settings.product_url),
-        InventoryClient(state.http, settings.inventory_url),
-        UserClient(state.http, settings.user_url),
+        InventoryClient(state.http, settings.inventory_url, settings.internal_auth_secret),
+        UserClient(state.http, settings.user_url, settings.internal_auth_secret),
         state.publisher,
         settings,
     )

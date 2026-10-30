@@ -1,6 +1,7 @@
 import logging
 
 import httpx
+from ecom_common.identity import sign_identity
 
 from app.domain import ProductInfo
 from app.errors import ServiceUnavailable
@@ -42,14 +43,20 @@ class UserClient:
 
     FIELDS = ("recipient", "line1", "line2", "city", "state", "postal_code", "country")
 
-    def __init__(self, http: httpx.AsyncClient, base_url: str) -> None:
-        self.http, self.base = http, base_url.rstrip("/")
+    def __init__(self, http: httpx.AsyncClient, base_url: str, secret: str = "") -> None:
+        self.http, self.base, self.secret = http, base_url.rstrip("/"), secret
+
+    def _who(self, user_id: str, path: str) -> dict[str, str]:
+        """Say who we act for, signed so the other service believes it (ecom_common.identity)."""
+        if self.secret:
+            return sign_identity(self.secret, user_id, "customer", "GET", path)
+        return {"X-User-Id": user_id}
 
     async def email(self, user_id: str) -> str | None:
-        """The customer's email from their profile, or None if the profile does not exist yet."""
+        """The customer's email from their profile, or None if there is no profile yet."""
         try:
             resp = await self.http.get(
-                f"{self.base}/api/v1/users/me", headers={"X-User-Id": user_id}
+                f"{self.base}/api/v1/users/me", headers=self._who(user_id, "/api/v1/users/me")
             )
         except httpx.HTTPError as exc:
             logger.warning("User service unreachable: %s", exc)
@@ -64,7 +71,8 @@ class UserClient:
         """The address's details, or None if this user has no such address."""
         try:
             resp = await self.http.get(
-                f"{self.base}/api/v1/users/me/addresses", headers={"X-User-Id": user_id}
+                f"{self.base}/api/v1/users/me/addresses",
+                headers=self._who(user_id, "/api/v1/users/me/addresses"),
             )
         except httpx.HTTPError as exc:
             logger.warning("User service unreachable: %s", exc)
@@ -80,8 +88,15 @@ class UserClient:
 
 
 class InventoryClient:
-    def __init__(self, http: httpx.AsyncClient, base_url: str) -> None:
-        self.http, self.base = http, base_url.rstrip("/")
+    def __init__(self, http: httpx.AsyncClient, base_url: str, secret: str = "") -> None:
+        self.http, self.base, self.secret = http, base_url.rstrip("/"), secret
+
+    def _who(self, user_id: str) -> dict[str, str]:
+        if self.secret:
+            return sign_identity(
+                self.secret, user_id, "customer", "POST", "/api/v1/inventory/availability"
+            )
+        return {"X-User-Id": user_id}
 
     async def availability(self, product_ids: list[str], user_id: str) -> dict[str, int]:
         """Units available per product. Raises ServiceUnavailable if inventory cannot answer."""
@@ -89,7 +104,7 @@ class InventoryClient:
             resp = await self.http.post(
                 f"{self.base}/api/v1/inventory/availability",
                 json={"product_ids": product_ids},
-                headers={"X-User-Id": user_id},  # the inventory service wants to know who asks
+                headers=self._who(user_id),  # the inventory service wants to know who asks
             )
         except httpx.HTTPError as exc:
             logger.warning("Inventory service unreachable: %s", exc)
