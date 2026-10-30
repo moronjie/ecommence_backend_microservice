@@ -31,5 +31,15 @@ class Settings(BaseServiceSettings):
     retry_max_seconds: float = 3600.0
     worker_interval_seconds: float = 2.0
 
+    def production_problems(self) -> list[str]:
+        problems = super().production_problems()
+        if self.email_provider == "console":
+            problems.append("EMAIL_PROVIDER=console only logs emails; customers would get nothing")
+        elif self.smtp_host in {"localhost", "127.0.0.1", "mailpit"}:
+            problems.append("SMTP_HOST points at a development mail catcher, not a real provider")
+        if self.from_address.endswith("@example.com"):
+            problems.append("FROM_ADDRESS must be an address on a domain you own")
+        return problems
+
 
 settings = Settings()

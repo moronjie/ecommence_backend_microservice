@@ -31,5 +31,20 @@ class Settings(BaseServiceSettings):
     payment_expiry_minutes: int = 25  # give up on a payment the customer never completed
     worker_interval_seconds: float = 3.0
 
+    def production_problems(self) -> list[str]:
+        problems = super().production_problems()
+        if self.provider == "fake":
+            problems.append(
+                "PAYMENT_PROVIDER=fake moves no real money "
+                "(set it to paystack and add PAYSTACK_SECRET_KEY)"
+            )
+        elif not self.paystack_secret_key:
+            problems.append("PAYSTACK_SECRET_KEY is missing")
+        elif self.paystack_secret_key.startswith("sk_test_"):
+            problems.append(
+                "PAYSTACK_SECRET_KEY is a TEST key; production needs a live key (sk_live_...)"
+            )
+        return problems
+
 
 settings = Settings()
