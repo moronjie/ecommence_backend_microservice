@@ -13,6 +13,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ecom_common.kafka import EventPublisher, KafkaPublisher
+from ecom_common.logging import request_id_ctx
+from ecom_common.metrics import count_event
 
 logger = logging.getLogger(__name__)
 
@@ -43,18 +45,36 @@ class EventDispatcher:
             handler = self.handlers.get(event["event_type"])
             event_id = event["event_id"]
         except (ValueError, KeyError, TypeError) as exc:
+            count_event(topic, "dead_lettered")
             await self._dead_letter(topic, key, raw, f"malformed event: {exc!r}")
             return
         if handler is None:
+            count_event(topic, "ignored")
             return  # not an event this service cares about
 
+        # Work under the id of the request that started all this. Logs, and any events we publish
+        # in turn, then carry the same id, so one checkout can be followed across every service.
+        token = request_id_ctx.set(str(event.get("correlation_id") or request_id_ctx.get()))
+        try:
+            await self._handle(topic, key, event, event_id, handler)
+        finally:
+            request_id_ctx.reset(token)
+
+    async def _handle(
+        self, topic: str, key: str, event: dict[str, Any], event_id: str, handler: Handler
+    ) -> None:
         last_error: Exception | None = None
         for attempt in range(1, self.max_attempts + 1):
             try:
                 await handler(event)
+                count_event(topic, "handled")
+                logger.info(
+                    "Handled %s (event %s)", topic, event_id
+                )  # shows up under the request id
                 return
             except Exception as exc:  # noqa: BLE001 - any handler failure is retried
                 last_error = exc
+                count_event(topic, "retried")
                 logger.warning(
                     "Handler failed for %s (attempt %d/%d): %r",
                     event_id,
@@ -64,6 +84,7 @@ class EventDispatcher:
                 )
                 if attempt < self.max_attempts:
                     await asyncio.sleep(self.backoff * attempt)
+        count_event(topic, "dead_lettered")
         await self._dead_letter(topic, key, event, f"failed after retries: {last_error!r}")
 
     async def _dead_letter(self, topic: str, key: str, original: Any, reason: str) -> None:

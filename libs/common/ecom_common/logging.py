@@ -32,3 +32,6 @@ def setup_logging(service_name: str, level: str = "INFO") -> None:
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(level.upper())
+    # These libraries log every single call at INFO, drowning real events and slowing busy services
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(max(logging.WARNING, root.level))
