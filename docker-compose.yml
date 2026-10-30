@@ -83,10 +83,12 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-local}  
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
       METRICS_TOKEN: ${METRICS_TOKEN:-}  
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}  
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_PUBLIC_KEY_FILE: ${JWT_PUBLIC_KEY_FILE:-}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-100}
+      CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:3000","http://localhost:5173"]}'
       LOGIN_RATE_LIMIT: ${LOGIN_RATE_LIMIT:-10}  
       REGISTER_RATE_LIMIT: ${REGISTER_RATE_LIMIT:-5}
       REDIS_URL: redis://redis:6379/0
@@ -113,6 +115,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-local}  
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
       METRICS_TOKEN: ${METRICS_TOKEN:-}  
+      LOG_LEVEL: ${LOG_LEVEL:-INFO} 
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_PRIVATE_KEY_FILE: ${JWT_PRIVATE_KEY_FILE:-}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/auth_db
@@ -138,6 +141,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-local}  
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
       METRICS_TOKEN: ${METRICS_TOKEN:-}  
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}  
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/user_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -154,6 +158,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-local}  
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
       METRICS_TOKEN: ${METRICS_TOKEN:-}  
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}  
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/product_db
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
@@ -172,6 +177,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-local}  
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
       METRICS_TOKEN: ${METRICS_TOKEN:-} 
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}  
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/inventory_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -188,6 +194,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-local}  
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
       METRICS_TOKEN: ${METRICS_TOKEN:-}  
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}  
       REDIS_URL: redis://redis:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       PRODUCT_URL: http://product:8000
@@ -206,6 +213,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-local}  
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
       METRICS_TOKEN: ${METRICS_TOKEN:-}  
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}  
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/order_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
@@ -222,6 +230,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-local}  
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
       METRICS_TOKEN: ${METRICS_TOKEN:-}  
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}  
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/payment_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       PROVIDER: ${PAYMENT_PROVIDER:-fake}
@@ -244,6 +253,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-local}  
       INTERNAL_AUTH_SECRET: ${INTERNAL_AUTH_SECRET:-dev-internal-secret}
       METRICS_TOKEN: ${METRICS_TOKEN:-}  
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}  
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/notification_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
