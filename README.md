@@ -1,6 +1,6 @@
 # E-Commerce Microservices (FastAPI)
 
-FastAPI microservices with PostgreSQL, Kafka, Redis and an API gateway. See [plan.md](plan.md) for the architecture and phases.
+FastAPI microservices with PostgreSQL, Kafka, Redis and an API gateway. See [docs/architecture.md](docs/architecture.md) for the architecture and [docs/adr/](docs/adr/) for the design decisions.
 
 ## Quick start
 ```bash
@@ -19,7 +19,7 @@ Use `success_response(...)` or raise `NotFound` / `Conflict` / etc. from `ecom_c
 ## Adding a service
 Copy `services/_template`, rename it, add a Dockerfile and compose entry, add a gateway route.
 
-## Gateway (Phase 1)
+## Gateway
 All client traffic goes through `services/gateway` (port 8000). It routes by path prefix (see
 `services/gateway/app/core/routes.py`), verifies the JWT, rate-limits per user/IP with Redis,
 forwards `X-User-Id` / `X-User-Role` / `X-Request-ID`, and maps upstream failures to uniform
@@ -32,7 +32,14 @@ cd services/_template && python -m uvicorn app.main:app --reload --port 8100   #
 curl localhost:8000/api/v1/template/ping
 ```
 
-## Auth service (Phase 2)
+### One place to try every API
+
+With the stack running, open http://localhost:8000/docs: a single Swagger page for all services, with an
+**Authorize** button (log in, paste the `access_token`). It is on by default and off when
+`ENVIRONMENT=production` (override with `DOCS_ENABLED`). For Postman, import
+`docs/postman/shop.postman_collection.json` (see `docs/postman/README.md`; `make postman` regenerates it).
+
+## Auth service
 `services/auth` (port 8001): `POST /api/v1/auth/register | login | refresh | logout`, `GET /me`.
 Passwords use argon2. Access tokens last 15 min; refresh tokens last 7 days and are single-use
 (rotated; used or logged-out tokens are denylisted in Redis). Registration writes a
@@ -49,7 +56,7 @@ python -m uvicorn app.main:app --reload --port 8001
 Never `pip install` a service into the shared venv; `make install` only installs the shared lib
 and third-party packages.
 
-## User service (Phase 3)
+## User service
 `services/user` (port 8002, route `/api/v1/users`): `GET/PATCH /me`, addresses under
 `/me/addresses` (add, update, delete; the first becomes the default; max 10), and admin-only
 `GET /` (paginated) and `GET /{user_id}`. The role comes from the gateway's `X-User-Role` header.
@@ -63,7 +70,7 @@ Running a service locally: `docker compose` now publishes only the gateway (port
 `docker-compose.override.yml` file (loaded automatically) also opens Postgres, Redis, Kafka and the
 services on localhost for development. For a locked-down run use `docker compose -f docker-compose.yml up`.
 
-## Product service (Phase 4)
+## Product service
 `services/product` (port 8003): categories (`/api/v1/categories`) and products (`/api/v1/products`).
 Anyone can browse; creating, changing and deleting need an admin token (checked from the gateway's
 `X-User-Role`). Prices are integers in cents (`1999` = 19.99). "Deleting" a product only hides it
@@ -82,7 +89,7 @@ Each create/update/delete writes `product.created` / `product.updated` (a full s
 Search uses `LIKE '%q%'`, which is fine for a small catalogue; for a large one add a Postgres trigram
 index or a search engine.
 
-## Inventory service (Phase 5)
+## Inventory service
 `services/inventory` (port 8004, route `/api/v1/inventory`). A stock row is created automatically from
 `product.created`. Admins set (`PUT /{id}`) or adjust (`POST /{id}/adjust`) stock; shoppers see only
 availability (`GET /{id}`, `POST /availability` for many products). Stock is `on_hand` minus `reserved`.
@@ -99,7 +106,7 @@ TEST_POSTGRES_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/inventor
 ```
 Use an empty throw-away database; the test creates and drops the tables.
 
-## Cart service (Phase 6)
+## Cart service
 `services/cart` (port 8005, route `/api/v1/cart`, login required): `GET /` (view), `POST /items`, `PUT /items/{product_id}`,
 `DELETE /items/{product_id}`, `DELETE /` (clear), `POST /checkout`. The cart lives only in Redis (a hash per user,
 30 days from the last change). There is no database, so there is no migration and no outbox.
@@ -113,7 +120,7 @@ checkout refuses to start an order without a real answer. The cart keeps a local
 Checkout returns 202 and publishes `cart.checked_out` (see `docs/events.md`). If publishing fails, the cart is kept
 and a retry reuses the same `checkout_id`, so the order service can ignore duplicates.
 
-## Order service (Phase 7)
+## Order service
 `services/order` (port 8006, route `/api/v1/orders`, login required). The order service is created by an event, not
 by an API call: it consumes `cart.checked_out` and creates a `pending` order (once per `checkout_id`), then reacts to
 the inventory and payment services as described in `docs/events.md`. Customers see their own orders
@@ -125,7 +132,7 @@ The order keeps its own copy of what was bought (names, prices) and the delivery
 address edits never change history. Orders stuck waiting for another service are cancelled by a background sweeper.
 If a payment arrives for an already-cancelled order, `order.refund_requested` is published for the payment service.
 
-## Payment service (Phase 8) - Paystack, for Ghana
+## Payment service - Paystack, for Ghana
 `services/payment` (port 8007, route `/api/v1/payments`). It reacts to `order.payment_requested`, starts a payment
 with the provider, and reports `payment.completed` / `payment.failed` back to the order service. It never sees card or
 mobile-money details: the customer pays on Paystack's own page (card or mobile money: MTN MoMo, Vodafone Cash,
@@ -156,7 +163,7 @@ fake provider.
 Not built yet: a customer-facing "pay now" page (your frontend redirects to the link), partial refunds, and
 restricting the webhook to Paystack's IP addresses.
 
-## Notification service (Phase 9) - email only
+## Notification service - email only
 `services/notification` (port 8008, route `/api/v1/notifications`). It listens for events and emails the customer:
 a welcome message, **order confirmed** (a receipt listing the items and total in cedis), **cancelled** (with the reason
 in plain language), **shipped** (with the delivery address), **delivered**, and **refund**. It sends no separate email for
@@ -181,3 +188,43 @@ Known limits: delivery is "at least once", so if the service crashes in the inst
 email and us recording it, that one email can be sent twice after the restart. There is no unsubscribe or marketing
 preference yet, because nothing marketing-related is sent (only messages about the customer's own orders and account).
 Email only: no SMS or WhatsApp.
+
+## Security and operations
+Full overview and diagrams: [docs/architecture.md](docs/architecture.md). The reasoning behind the choices: [docs/adr/](docs/adr/).
+
+### Security
+* **RS256 login tokens.** Run `make keys` (or `python scripts/generate_keys.py`). It writes the private key to `.keys/auth/` and the
+  public key to `.keys/gateway/` (git-ignored) and prints the lines for your `.env`. Docker mounts each folder into only the
+  container that needs it, so the gateway can never read the private key. Without keys the stack uses HS256 (one shared secret),
+  fine for development only.
+* **Signed identities.** Set `INTERNAL_AUTH_SECRET` to a long random value: the gateway signs who is calling and every service discards
+  unsigned identities, so reaching a service directly no longer lets anyone pretend to be an admin.
+* **Logins.** Five wrong passwords lock an email for 15 minutes (the same for emails that do not exist, so nothing reveals who is
+  registered); the gateway also limits login to 10 and sign-up to 5 per minute per IP; logging out kills the access token at once.
+* **`ENVIRONMENT=production`** makes every service refuse to start while any unsafe default remains, and tells you exactly which: weak
+  or missing secrets, HS256 tokens, the default Postgres password, the fake payment provider or a Paystack test key, console-only
+  email or a development mail catcher, no `METRICS_TOKEN`. A bad signing key also stops the service at start-up with a clear message.
+
+Put these settings in `.env` (Docker reads it automatically). On Windows Git Bash, do not `export` a value like
+`JWT_PRIVATE_KEY_FILE=/run/keys/jwt_private.pem`: Git Bash rewrites it into a Windows path before Docker sees it.
+
+### Seeing what is happening
+* Every service serves Prometheus metrics at `/metrics` (requests, errors, latency by route template, events handled / retried / dead-lettered).
+  Set `METRICS_TOKEN` to require a bearer token (the gateway is on the public port; production insists on it).
+* With the dev override: **Grafana** at http://localhost:3001 (admin / admin) shows a ready-made "Shop overview" dashboard;
+  **Prometheus** at http://localhost:9090 (Status > Targets shows every service).
+* **One id follows a checkout across services.** Send `X-Request-ID: my-test-1` with a checkout, then
+  `docker compose logs | grep my-test-1`: you will see the gateway, cart, order, inventory and payment all under that id.
+* Every service logs JSON, and has `/health` and `/ready`.
+
+### Proving it works
+| Command | What it checks | Needs |
+|---|---|---|
+| `make test` | all unit tests (fast, SQLite and fakes) | nothing |
+| `make lint` | style and types | nothing |
+| `make migrations-check` | every migration applies, matches the models, rolls back, re-applies on **real Postgres** | Docker Postgres (`POSTGRES_PORT=5433 make ...` if you moved it) |
+| `make e2e` | a real purchase through everything with **real Kafka**, plus attacks on the live stack | the whole stack running (`make up`) |
+| `make loadtest` | 20 simulated shoppers for 30 s: requests per second, errors, latency percentiles | the stack, started with `RATE_LIMIT_REQUESTS=1000000` |
+
+CI runs all of these (jobs `test`, `postgres`, `e2e`).
+
